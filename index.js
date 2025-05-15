@@ -47,6 +47,8 @@ async function run() {
 
     //Database collections
     const userCollection = client.db("bms").collection("users");
+    const cityCollection = client.db("bms").collection("dhaka");
+    const apartmentCollection = client.db("bms").collection("apartments");
 
     //Verify token middleware
     const verifyToken = (req, res, next) => {
@@ -62,7 +64,17 @@ async function run() {
         next();
       });
     };
-
+    //Verify Admin
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      const isAdmin = user?.role === "admin";
+      if (!isAdmin) {
+        return res.status(403).send({ message: "Unauthorize access" });
+      }
+      next();
+    };
     //Jwt token
     app.post("/jwt", async (req, res) => {
       const user = req.body;
@@ -92,6 +104,24 @@ async function run() {
       const role = user?.role;
       res.send(role);
     });
+
+    //Get cities data
+    app.get("/cities", async (req, res) => {
+      const cities = await cityCollection.find().toArray();
+      res.send(cities);
+    });
+
+    //Add apartment
+    app.post(
+      "/apartments/:email",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const newApartment = req.body;
+        const result = await apartmentCollection.insertOne(newApartment);
+        res.send(result);
+      }
+    );
 
     await client.db("admin").command({ ping: 1 });
     console.log(
