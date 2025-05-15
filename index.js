@@ -123,6 +123,18 @@ async function run() {
       }
     );
 
+    app.get(
+      "/apartments/:email",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const email = req.params.email;
+        const query = { "user.email": email };
+        const result = await apartmentCollection.find(query).toArray();
+        res.send(result);
+      }
+    );
+
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
