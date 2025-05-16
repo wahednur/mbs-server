@@ -49,6 +49,7 @@ async function run() {
     const userCollection = client.db("bms").collection("users");
     const cityCollection = client.db("bms").collection("dhaka");
     const apartmentCollection = client.db("bms").collection("apartments");
+    const flatCollection = client.db("bms").collection("flats");
 
     //Verify token middleware
     const verifyToken = (req, res, next) => {
@@ -117,8 +118,9 @@ async function run() {
       verifyToken,
       verifyAdmin,
       async (req, res) => {
-        const newApartment = req.body;
-        const result = await apartmentCollection.insertOne(newApartment);
+        const appertment = req.body;
+        const newApp = { ...appertment, availableFlat: appertment.flatQty };
+        const result = await apartmentCollection.insertOne(newApp);
         res.send(result);
       }
     );
@@ -134,7 +136,27 @@ async function run() {
         res.send(result);
       }
     );
+    //get Appetment for add flat
+    app.get("/apartments", async (req, res) => {
+      const retult = await apartmentCollection.find().toArray();
+      res.send(retult);
+    });
 
+    //Add flat
+
+    app.post("/flats/:email", verifyToken, verifyAdmin, async (req, res) => {
+      const newFlat = req.body;
+      const result = await flatCollection.insertOne(newFlat);
+      res.send(result);
+    });
+
+    //get Signle apartment
+    app.get("/apartment/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await apartmentCollection.findOne(query);
+      res.send(result);
+    });
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
