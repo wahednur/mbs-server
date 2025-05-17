@@ -50,6 +50,7 @@ async function run() {
     const cityCollection = client.db("bms").collection("dhaka");
     const apartmentCollection = client.db("bms").collection("apartments");
     const flatCollection = client.db("bms").collection("flats");
+    const couponCollection = client.db("bms").collection("coupons");
 
     //Verify token middleware
     const verifyToken = (req, res, next) => {
@@ -155,6 +156,14 @@ async function run() {
       res.send(result);
     });
 
+    // Get flats by admin
+    app.get("/flats/:email", verifyToken, verifyAdmin, async (req, res) => {
+      const email = req.params.email;
+      const query = { "apartment.user.email": email };
+      const reslt = await flatCollection.find(query).toArray();
+      res.send(reslt);
+    });
+
     // Get single Flat
     app.get("/flats/:id", async (req, res) => {
       const id = req.params.id;
@@ -178,6 +187,25 @@ async function run() {
       const search = { $gte: min, $lte: max };
 
       const result = await flatCollection.find({ rent: search }).toArray();
+      res.send(result);
+    });
+
+    //Coupon
+    app.post("/coupon/:email", verifyToken, verifyAdmin, async (req, res) => {
+      const coupon = req.body;
+      if (coupon.coupon) {
+        coupon.coupon = coupon.coupon.toUpperCase();
+      }
+      const result = await couponCollection.insertOne(coupon);
+      res.send(result);
+    });
+
+    app.get("/coupons", verifyToken, verifyAdmin, async (req, res) => {
+      const result = await couponCollection.find().toArray();
+      res.send(result);
+    });
+    app.get("/coupons-pup", async (req, res) => {
+      const result = await couponCollection.find().toArray();
       res.send(result);
     });
 
