@@ -149,7 +149,19 @@ async function run() {
       const result = await flatCollection.insertOne(newFlat);
       res.send(result);
     });
+    //Get flats
+    app.get("/flats", async (req, res) => {
+      const result = await flatCollection.find().toArray();
+      res.send(result);
+    });
 
+    // Get single Flat
+    app.get("/flats/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await flatCollection.findOne(query);
+      res.send(result);
+    });
     //get Signle apartment
     app.get("/apartment/:id", async (req, res) => {
       const id = req.params.id;
@@ -157,6 +169,18 @@ async function run() {
       const result = await apartmentCollection.findOne(query);
       res.send(result);
     });
+
+    //Seaching
+    app.get("/searching", async (req, res) => {
+      const { min, max } = req.query;
+      const minPrice = parseInt(min) || 0;
+      const maxPrice = parseInt(max) || 10000000;
+      const search = { $gte: min, $lte: max };
+
+      const result = await flatCollection.find({ rent: search }).toArray();
+      res.send(result);
+    });
+
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
