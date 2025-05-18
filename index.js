@@ -51,6 +51,7 @@ async function run() {
     const apartmentCollection = client.db("bms").collection("apartments");
     const flatCollection = client.db("bms").collection("flats");
     const couponCollection = client.db("bms").collection("coupons");
+    const agreementCollection = client.db("bms").collection("agreements");
 
     //Verify token middleware
     const verifyToken = (req, res, next) => {
@@ -98,6 +99,11 @@ async function run() {
       res.send(restult);
     });
 
+    // Get all user for admin
+    app.get("/users/:email", verifyToken, verifyAdmin, async (req, res) => {
+      const restult = await userCollection.find().toArray();
+      res.send(restult);
+    });
     // Get User roles
     app.get("/user-role/:email", async (req, res) => {
       const email = req.params.email;
@@ -105,6 +111,19 @@ async function run() {
       const user = await userCollection.findOne(query);
       const role = user?.role;
       res.send(role);
+    });
+
+    //Member request
+    app.patch("/member-request/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      // const user = await userCollection.findOne(query)
+      const updateRole = {
+        $set: {
+          role: "pending",
+        },
+      };
+      const result = await userCollection.updateOne(query, updateRole);
     });
 
     //Get cities data
@@ -150,10 +169,31 @@ async function run() {
       const result = await flatCollection.insertOne(newFlat);
       res.send(result);
     });
-    //Get flats
+    // //Get flats
+    // app.get("/flats", async (req, res) => {
+    //   const result = await flatCollection.find().toArray();
+    //   res.send(result);
+    // });
+
+    // GET flats with pagination
     app.get("/flats", async (req, res) => {
-      const result = await flatCollection.find().toArray();
-      res.send(result);
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 6;
+      const skip = (page - 1) * limit;
+
+      const total = await flatCollection.countDocuments();
+      const flats = await flatCollection
+        .find()
+        .skip(skip)
+        .limit(limit)
+        .toArray();
+
+      res.send({
+        flats,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
+      });
     });
 
     // Get flats by admin
@@ -165,7 +205,14 @@ async function run() {
     });
 
     // Get single Flat
-    app.get("/flats/:id", async (req, res) => {
+    app.get("/flats-details/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await flatCollection.findOne(query);
+      res.send(result);
+    });
+    //Agrment flat
+    app.get("/agreement-flat/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await flatCollection.findOne(query);
@@ -207,6 +254,31 @@ async function run() {
     app.get("/coupons-pup", async (req, res) => {
       const result = await couponCollection.find().toArray();
       res.send(result);
+    });
+
+    // agreement request
+    app.post("/agreement-request", async (req, res) => {
+      const agreement = req.body;
+      const result = await agreementCollection.insertOne(agreement);
+      res.send(result);
+    });
+    //Payment
+    app.post("/create-payment-intent", async (req, res) => {
+      const data = req.body;
+      console.log("Payment data", data);
+      const { amount } = req.body;
+
+      if (!amount) return res.status(400).json({ error: "Amount required" });
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: parseInt(amount * 100), // amount in cents
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
     });
 
     await client.db("admin").command({ ping: 1 });
