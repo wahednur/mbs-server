@@ -14,7 +14,8 @@ const app = express();
 
 //Cors options
 const corsOption = {
-  origin: ["http://localhost:5173", "http://localhost:5174"],
+  origin: ["https://wsbms.netlify.app", "http://localhost:5173"],
+
   credentials: true,
   optionSuccessStatus: 200,
 };
@@ -205,20 +206,51 @@ async function run() {
     });
 
     // Get single Flat
+    // app.get("/flats-details/:id", async (req, res) => {
+    //   const id = req.params.id;
+    //   const query = { _id: new ObjectId(id) };
+    //   const result = await flatCollection.findOne(query);
+    //   res.send(result);
+    // });
+    // Agrment flat
+    const { ObjectId } = require("mongodb");
+
     app.get("/flats-details/:id", async (req, res) => {
       const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await flatCollection.findOne(query);
-      res.send(result);
+
+      try {
+        const result = await flatCollection
+          .aggregate([
+            {
+              $match: { _id: new ObjectId(id) },
+            },
+            {
+              $addFields: {
+                apartIdObj: { $toObjectId: "$apartId" },
+              },
+            },
+            {
+              $lookup: {
+                from: "apartments",
+                localField: "apartIdObj",
+                foreignField: "_id",
+                as: "apartment",
+              },
+            },
+            {
+              $unwind: "$apartment",
+            },
+          ])
+          .toArray();
+
+        res.send(result[0]);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Internal Server Error" });
+      }
     });
-    //Agrment flat
-    app.get("/agreement-flat/:id", verifyToken, async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await flatCollection.findOne(query);
-      res.send(result);
-    });
-    //get Signle apartment
+
+    //Agreement
     app.get("/apartment/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -254,6 +286,21 @@ async function run() {
     app.get("/coupons-pup", async (req, res) => {
       const result = await couponCollection.find().toArray();
       res.send(result);
+    });
+
+    //Coupon check
+    app.get("/coupons/:code", async (req, res) => {
+      const coupon = req.params.code;
+      const query = { coupon: coupon }; // ✅ spelling ঠিক করা হলো
+
+      const couponCheck = await couponCollection.findOne(query);
+      console.log("Check", couponCheck);
+
+      if (!couponCheck) {
+        return res.status(404).json({ message: "Coupon not found" });
+      }
+
+      res.send(couponCheck);
     });
 
     // agreement request
