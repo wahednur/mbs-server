@@ -166,9 +166,28 @@ async function run() {
     //Add flat
 
     app.post("/flats/:email", verifyToken, verifyAdmin, async (req, res) => {
-      const newFlat = req.body;
-      const result = await flatCollection.insertOne(newFlat);
-      res.send(result);
+      const flatData = req.body;
+      try {
+        const { floor, flat, apartId } = flatData;
+        const existing = await flatCollection.findOne({
+          apartId: apartId,
+          floor: parseInt(floor),
+          "flat.flatNo": flat.flatNo,
+        });
+        if (existing) {
+          return res
+            .status(409)
+            .json({
+              message:
+                "Flat already exists on this floor with the same flat number.",
+            });
+        }
+        const result = await flatCollection.insertOne(flatData);
+        res.send(result);
+      } catch (error) {
+        console.error(err);
+        res.status(500).json({ message: "Internal Server Error" });
+      }
     });
     // //Get flats
     // app.get("/flats", async (req, res) => {
@@ -198,11 +217,45 @@ async function run() {
     });
 
     // Get flats by admin
+    // app.get("/flats/:email", verifyToken, verifyAdmin, async (req, res) => {
+    //   const email = req.params.email;
+    //   const query = { "apartment.user.email": email };
+    //   const result = await flatCollection.find(query).toArray();
+    //   res.send(result);
+    // });
     app.get("/flats/:email", verifyToken, verifyAdmin, async (req, res) => {
       const email = req.params.email;
-      const query = { "apartment.user.email": email };
-      const reslt = await flatCollection.find(query).toArray();
-      res.send(reslt);
+
+      try {
+        const result = await flatCollection
+          .aggregate([
+            {
+              $addFields: {
+                apartIdObj: { $toObjectId: "$apartId" },
+              },
+            },
+            {
+              $lookup: {
+                from: "apartments",
+                localField: "apartIdObj",
+                foreignField: "_id",
+                as: "apartment",
+              },
+            },
+            { $unwind: "$apartment" },
+            {
+              $match: {
+                "apartment.user.email": email,
+              },
+            },
+          ])
+          .toArray();
+
+        res.send(result);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Internal Server Error" });
+      }
     });
 
     // Get single Flat
